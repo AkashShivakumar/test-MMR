@@ -1,0 +1,60 @@
+---
+- name: Get stuff from git
+  git:
+   repo: git@github.com:PearlThoughts/mmr-sales-splash.git
+   dest: "{{ project_root_dir }}"
+   version: master
+   accept_hostkey: yes
+   key_file: ~/.ssh/id_rsa
+   force: yes
+  become_user: "{{ host_user }}"
+  delegate_to: localhost
+- name: Install packages based on package.json.
+  npm:
+    path: "{{ project_root_dir }}"
+  delegate_to: localhost
+- name: Npm build - (local control server)
+  shell: npm run build
+  args:
+    chdir: "{{ project_root_dir }}"
+  delegate_to: localhost
+- name: Archive the Public directory
+  archive:
+    path: "{{ project_root_dir }}/public"
+    dest: "{{ project_root_dir }}/public.zip"
+  delegate_to: localhost
+- name: Create Sales-Build directory (In server)
+  file:
+    path: "{{ deploy_root_dir }}"
+    state: directory
+- name: Copy Public.zip (local control to host server)
+  synchronize:
+    src: "{{ project_root_dir }}/public.zip"
+    dest: "{{ deploy_root_dir }}"
+#-----------------------------------------------
+# - name: install unzip package
+#   apt: name=unzip state=present force_apt_get=yes
+# - name: Unarchive a file that is already on the remote machine
+#   unarchive:
+#     src: "{{ deploy_root_dir }}/public.zip"
+#     dest: "{{ deploy_root_dir }}"
+#     remote_src: yes
+# - name: Copy to parent dir
+#   shell: sudo cp -a public/. "{{ deploy_root_dir }}"
+#   args:
+#     chdir: "{{ deploy_root_dir }}"
+# - name: Remove Public directory
+#   file:
+#     path: "{{ deploy_root_dir }}/public"
+#     state: absent
+# - name: Remove Public.zip
+#   file:
+#     path: "{{ deploy_root_dir }}/public.zip"
+#     state: absent
+- name: Recursively decompress files in public.zip
+  win_unzip:
+    src: "{{ deploy_root_dir }}/public.zip"
+    dest: "{{ deploy_root_dir }}"
+    #creates: "{{ deploy_root_dir }}/public"
+    recurse: yes
+    delete_archive: yes
